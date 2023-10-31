@@ -9,6 +9,7 @@ const {
   loginSchema,
   subscriptionSchema,
 } = require("../../middleware/isValidAuth");
+const upload = require("../../middleware/upload");
 
 const router = express.Router();
 
@@ -25,6 +26,13 @@ router.patch(
   authenticate,
   validateAuth(subscriptionSchema),
   auth.setSubscription
+);
+
+router.patch(
+  "/avatars",
+  authenticate,
+  upload.single("avatar"),
+  auth.updateAvatar
 );
 
 module.exports = router;

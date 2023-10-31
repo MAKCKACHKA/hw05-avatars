@@ -1,9 +1,14 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const gravatar = require("gravatar");
+const path = require("path");
+const fs = require("fs/promises");
+const jimp = require("jimp");
 
 const User = require("../models/userSchema");
 const HttpError = require("../helpers/error");
 const { SECRET_KEY } = require("../config");
+const avatarsDir = path.join(__dirname, "../", "public", "avatars");
 
 const register = async (req, res) => {
   const { email, password } = req.body;
@@ -12,7 +17,13 @@ const register = async (req, res) => {
     return HttpError(res, 409, "Email in use");
   } else {
     const hashPassword = await bcrypt.hash(password, 10);
-    const newUser = await User.create({ ...req.body, password: hashPassword });
+    const avatarURL = gravatar.url(email);
+
+    const newUser = await User.create({
+      ...req.body,
+      password: hashPassword,
+      avatarURL,
+    });
     res.status(201).json({
       user: { email: newUser.email, subscription: "starter" },
     });
@@ -76,10 +87,32 @@ const setSubscription = async (req, res) => {
   res.status(200).json(result);
 };
 
+const updateAvatar = async (req, res) => {
+  if (!req.user) {
+    return HttpError(res, 401, "Not authorized");
+  }
+  const { _id } = req.user;
+  const { path: tempUpload, originalname } = req.file;
+  const filename = `${_id}_${originalname}`;
+  const resultUpload = path.join(avatarsDir, filename);
+  await fs.rename(tempUpload, resultUpload);
+
+  const image = await jimp.read(resultUpload);
+  image.resize(250, 250).writeAsync(resultUpload);
+
+  const avatarURL = path.join("avatars", filename);
+  await User.findByIdAndUpdate(_id, { avatarURL });
+
+  res.json({
+    avatarURL,
+  });
+};
+
 module.exports = {
   register,
   login,
   logout,
   getCurrent,
   setSubscription,
+  updateAvatar,
 };
